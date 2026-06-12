@@ -1,202 +1,36 @@
-# Elimisha 🎓
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Overview
+## Getting Started
 
-Elimisha is an AI-powered scholarship and bursary matching platform designed to help students discover educational funding opportunities that align with their academic, financial, and personal circumstances.
+First, run the development server:
 
-Many students miss out on scholarships and bursaries because information is scattered across multiple websites, eligibility requirements are difficult to interpret, and finding relevant opportunities is time-consuming. Elimisha addresses this challenge by centralizing funding opportunities and automatically matching students with opportunities they are likely to qualify for.
-
----
-
-## Problem Statement
-
-Students often face the following challenges when searching for educational funding:
-
-* Scholarship and bursary information is fragmented across multiple platforms.
-* Eligibility requirements are difficult to understand and compare.
-* Students spend significant time manually searching for opportunities.
-* Many students miss opportunities they qualify for simply because they never discover them.
-* Existing platforms rarely provide personalized recommendations.
-
----
-
-## Solution
-
-Elimisha simplifies the scholarship discovery process by allowing students to create a profile and receive personalized funding recommendations.
-
-The platform analyzes factors such as:
-
-* County or region of residence
-* Institution and course of study
-* Year of study
-* Household income
-* Disability status
-* Orphan or vulnerable student status
-* Other eligibility requirements
-
-Based on these factors, Elimisha generates a match score and explains why a particular bursary or scholarship is relevant to the student.
-
----
-
-## Key Features
-
-### Student Profiles
-
-Students can create and maintain a profile containing academic, demographic, and financial information.
-
-### Scholarship & Bursary Database
-
-A centralized repository of funding opportunities from:
-
-* Government programs
-* County bursaries
-* NGOs
-* Foundations
-* Corporate sponsorship programs
-* International scholarship providers
-
-### Intelligent Matching Engine
-
-Automatically compares student profiles against eligibility requirements and ranks opportunities based on suitability.
-
-### Match Explanations
-
-Provides transparency by explaining why a student qualifies for a particular opportunity.
-
-Example:
-
-Match Score: 92%
-
-Reasons:
-
-* Resident of Nairobi County
-* Household income below required threshold
-* First-year undergraduate student
-
-### Search & Filtering
-
-Students can search and filter opportunities based on:
-
-* Deadline
-* Funding provider
-* Amount
-* Location
-* Category
-
-### Saved Opportunities
-
-Students can bookmark opportunities for future reference.
-
----
-
-## System Architecture
-
-```text
-Student Profile
-       │
-       ▼
-Eligibility Engine
-       │
-       ▼
-Matching Algorithm
-       │
-       ▼
-Ranked Opportunities
-       │
-       ▼
-Match Explanations
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
----
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Technology Stack
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-### Frontend
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-* React
-* TypeScript
-* Tailwind CSS
-* Vite
+## Learn More
 
-### Backend
+To learn more about Next.js, take a look at the following resources:
 
-* FastAPI
-* Python
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### Database
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-* PostgreSQL
+## Deploy on Vercel
 
-### AI & Recommendation Layer
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-* Rule-based eligibility matching
-* Explainable recommendation scoring
-* Future machine learning enhancements
-
-### Deployment
-
-* Frontend: Vercel
-* Backend: Render
-* Database: PostgreSQL / Neon
-
----
-
-## Database Overview
-
-Core entities include:
-
-* Users
-* Student Profiles
-* Bursaries
-* Eligibility Rules
-* Applications
-* Saved Opportunities
-
-The system stores eligibility requirements separately from bursary records, allowing flexible and scalable matching logic.
-
----
-
-## Future Enhancements
-
-* Machine learning–based recommendation engine
-* Scholarship deadline reminders
-* Email notifications
-* Scholarship application tracking
-* OCR document verification
-* AI-powered scholarship assistant chatbot
-* Mobile application
-* Analytics dashboard for funding organizations
-
----
-
-## Project Goals
-
-The primary objectives of Elimisha are:
-
-1. Improve access to educational funding opportunities.
-2. Reduce the time students spend searching for scholarships.
-3. Increase awareness of bursaries and scholarships.
-4. Provide transparent and explainable recommendations.
-5. Promote educational equity through technology.
-
----
-
-## Project Status
-
-🚧 Currently in development
-
-Planned MVP Features:
-
-* Student registration
-* Profile creation
-* Scholarship database
-* Eligibility matching engine
-* Recommendation dashboard
-* Opportunity bookmarking
-
----
-
-## Author
-
-Catherine Mutheu Muindi
-Focused on Software Engineering, Artificial Intelligence, and Machine Learning.
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
