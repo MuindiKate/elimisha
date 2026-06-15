@@ -17,6 +17,13 @@ interface Bursary {
   category: string
 }
 
+interface MatchResult {
+  score: number
+  verdict: string
+  strengths: string[]
+  gaps: string[]
+}
+
 export default function BursaryDetailPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -28,8 +35,12 @@ export default function BursaryDetailPage() {
   const [isSaved, setIsSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // AI Match Score Engine States
+  const [matchData, setMatchData] = useState<MatchResult | null>(null)
+  const [loadingAI, setLoadingAI] = useState(false)
+
   useEffect(() => {
-    async function fetchBursaryDetails() {
+    async function fetchBursaryAndMatch() {
       try {
         setLoading(true)
         const { data, error: fetchError } = await supabase
@@ -41,10 +52,10 @@ export default function BursaryDetailPage() {
         if (fetchError) throw fetchError
         setBursary(data)
 
-        // Check if application is already tracked by this authenticated session
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-          const { data: existingApp, error: appError } = await supabase
+          // Check if application is already tracked by this authenticated session
+          const { data: existingApp } = await supabase
             .from('applications')
             .select('id')
             .eq('user_id', user.id)
@@ -54,16 +65,25 @@ export default function BursaryDetailPage() {
           if (existingApp) {
             setIsSaved(true)
           }
+
+          // Fetch the live AI Match compatibility analysis
+          setLoadingAI(true)
+          const res = await fetch(`/api/bursaries/${id}/match`)
+          if (res.ok) {
+            const scoreJson = await res.json()
+            setMatchData(scoreJson)
+          }
         }
       } catch (err: any) {
-        console.error('Error fetching bursary details:', err)
-        setError(err.message || 'Failed to load bursary details.')
+        console.error('Error loading page details:', err)
+        setError(err.message || 'Failed to load details.')
       } finally {
         setLoading(false)
+        setLoadingAI(false)
       }
     }
 
-    if (id) fetchBursaryDetails()
+    if (id) fetchBursaryAndMatch()
   }, [id, supabase])
 
   const handleSaveBursary = async () => {
@@ -78,8 +98,7 @@ export default function BursaryDetailPage() {
 
       if (isSaved) return
 
-      // Explicitly insert matching your EXACT schema constraints:
-      // status: 'Applied' 
+      // Aligned with constraints: Using 'Applied'
       const { error: insertError } = await supabase
         .from('applications')
         .insert([
@@ -91,14 +110,13 @@ export default function BursaryDetailPage() {
         ])
 
       if (insertError) {
-        // Log the complete deep object breakdown to avoid empty {} prints
-        console.dir(insertError)
-        throw new Error(insertError.message || `Database error code: ${insertError.code}`)
+        console.dir(insertError) // Breakdown deep error attributes safely
+        throw new Error(insertError.message || `Database validation failed: ${insertError.code}`)
       }
       
       setIsSaved(true)
     } catch (err: any) {
-      console.error('Detailed Error Context:', err)
+      console.error('Detailed Tracking Context:', err)
       alert(err.message || 'Something went wrong while tracking.')
     } finally {
       setIsSaving(false)
@@ -115,8 +133,8 @@ export default function BursaryDetailPage() {
 
   if (error || !bursary) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl p-8 border border-gray-200 shadow-sm text-center">
+      <div className="min-h-screen p-8 bg-gray-50 text-center">
+        <div className="max-w-3xl mx-auto bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Bursary Not Found</h2>
           <p className="text-gray-600 mb-6">{error || "The bursary you are looking for doesn't exist."}</p>
           <Link href="/bursaries" className="text-indigo-600 font-medium hover:underline">
@@ -131,14 +149,17 @@ export default function BursaryDetailPage() {
     <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         
+        {/* Navigation Breadcrumb */}
         <div className="mb-6">
           <Link href="/bursaries" className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition flex items-center gap-1">
             ← Back to All Bursaries
           </Link>
         </div>
 
+        {/* Core Layout Wrapper */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           
+          {/* Header Block */}
           <div className="p-6 sm:p-8 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 mb-3">
@@ -167,6 +188,7 @@ export default function BursaryDetailPage() {
             </div>
           </div>
 
+          {/* Core Descriptive Metrics */}
           <div className="grid grid-cols-2 border-b border-gray-100 divide-x divide-gray-100 bg-slate-50/50">
             <div className="p-4 text-center">
               <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Value / Amount</span>
@@ -184,10 +206,58 @@ export default function BursaryDetailPage() {
             </div>
           </div>
 
+          {/* Content Body */}
           <div className="p-6 sm:p-8 space-y-8">
+            
+            {/* Elimisha AI Eligibility Match Section */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-6 text-white shadow-md border border-indigo-900/40">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold tracking-tight text-indigo-200">Elimisha AI Eligibility Match</h3>
+                  <p className="text-xs text-slate-300 mt-0.5">Real-time profile compatibility evaluation</p>
+                </div>
+                {loadingAI ? (
+                  <div className="h-10 w-10 rounded-full border-4 border-indigo-400 border-t-transparent animate-spin shrink-0" />
+                ) : matchData ? (
+                  <div className="text-right shrink-0">
+                    <span className="text-3xl font-black text-emerald-400">{matchData.score}%</span>
+                    <span className="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mt-0.5">
+                      {matchData.verdict}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Sign in to load AI alignment index</span>
+                )}
+              </div>
+
+              {matchData && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border-t border-indigo-900/60 pt-4 text-sm">
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-2">✨ Alignment Factors</h4>
+                    <ul className="space-y-1.5 text-slate-200 text-xs list-disc list-inside">
+                      {matchData.strengths.map((str, i) => (
+                        <li key={i} className="leading-relaxed">{str}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wide mb-2">⚠️ Review Points / Gaps</h4>
+                    <ul className="space-y-1.5 text-slate-200 text-xs list-disc list-inside">
+                      {matchData.gaps.map((gap, i) => (
+                        <li key={i} className="leading-relaxed">{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* General Fields */}
             <div>
               <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-2">About this Bursary</h3>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">{bursary.description}</p>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                {bursary.description}
+              </p>
             </div>
 
             <div>
@@ -214,6 +284,7 @@ export default function BursaryDetailPage() {
                 <p className="text-sm text-gray-500 italic">No specific documents listed.</p>
               )}
             </div>
+
           </div>
         </div>
 
