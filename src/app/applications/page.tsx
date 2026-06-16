@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Navbar from '@/components/Navbar'
 
 type Application = {
   id: string
@@ -158,7 +159,8 @@ export default function ApplicationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
+        <Navbar />
+        
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-6">
         <div className="max-w-3xl mx-auto">

@@ -1,6 +1,7 @@
 import { createServerSideClient } from '@/lib/supabase.server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import Navbar from '@/components/Navbar'
 
 export default async function DashboardPage() {
   const supabase = await createServerSideClient()
@@ -54,28 +55,7 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
 
       {/* Top navbar */}
-      <nav className="bg-white border-b border-gray-100 px-4 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <span className="text-lg font-bold text-green-600">Elimisha</span>
-          <div className="flex items-center gap-6">
-            <Link href="/bursaries"
-              className="text-sm text-gray-600 hover:text-green-600 
-              transition-colors font-medium">
-              Browse
-            </Link>
-            <Link href="/applications"
-              className="text-sm text-gray-600 hover:text-green-600 
-              transition-colors font-medium">
-              My Applications
-            </Link>
-            <Link href="/onboarding"
-              className="text-sm text-gray-600 hover:text-green-600 
-              transition-colors font-medium">
-              Profile
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
 

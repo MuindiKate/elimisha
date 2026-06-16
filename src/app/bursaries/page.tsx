@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import Navbar from '@/components/Navbar'
 
 // TypeScript type that mirrors our bursaries table
 // This gives us autocomplete and catches errors at compile time
@@ -132,8 +133,9 @@ export default function BursariesPage() {
     b.provider.toLowerCase().includes(search.toLowerCase())
   )
 
-  return (
+    return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar />
 
       {/* Header */}
       <div className="bg-white border-b border-gray-100 px-4 py-6">
