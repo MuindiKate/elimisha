@@ -5,6 +5,157 @@ import { createClient } from '@/lib/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+// AI Match Score component
+// Calls our API route which calls Anthropic
+function AIMatchScore({ bursaryId, bursary }: { 
+  bursaryId: string
+  bursary: Bursary 
+}) {
+  const [score, setScore] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchProfile()
+  }, [])
+
+  async function fetchProfile() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (data) {
+      setProfile(data)
+    }
+  }
+
+  async function getMatchScore() {
+    if (!profile) return
+    setLoading(true)
+
+    try {
+      // Call our server-side API route
+      const response = await fetch('/api/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, bursary })
+      })
+
+      const data = await response.json()
+      setScore(data)
+    } catch (error) {
+      console.error('Error getting match score:', error)
+    }
+
+    setLoading(false)
+  }
+
+  // Color coding based on score
+  const scoreColor = score?.score >= 75
+    ? 'text-green-600'
+    : score?.score >= 50
+    ? 'text-orange-500'
+    : 'text-red-500'
+
+  const scoreBg = score?.score >= 75
+    ? 'bg-green-50 border-green-100'
+    : score?.score >= 50
+    ? 'bg-orange-50 border-orange-100'
+    : 'bg-red-50 border-red-100'
+
+  if (!profile) return null
+
+  return (
+    <div className={`rounded-xl border p-5 mb-4 ${
+      score ? scoreBg : 'bg-gray-50 border-gray-100'
+    }`}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-gray-900 text-sm">
+            ✨ AI Match Score
+          </h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            How well this bursary fits your profile
+          </p>
+        </div>
+        {score && (
+          <div className="text-right">
+            <span className={`text-3xl font-bold ${scoreColor}`}>
+              {score.score}
+            </span>
+            <span className="text-gray-400 text-sm">/100</span>
+          </div>
+        )}
+      </div>
+
+      {score ? (
+        <div className="space-y-3">
+          {/* Score bar */}
+          <div className="w-full bg-white rounded-full h-2 border border-gray-100">
+            <div
+              className={`h-2 rounded-full transition-all duration-700 ${
+                score.score >= 75 ? 'bg-green-500' :
+                score.score >= 50 ? 'bg-orange-400' : 'bg-red-400'
+              }`}
+              style={{ width: `${score.score}%` }}
+            />
+          </div>
+
+          {/* Eligibility */}
+          <div className={`text-xs font-medium px-2 py-1 rounded-full inline-block ${
+            score.eligible
+              ? 'bg-green-100 text-green-700'
+              : 'bg-red-100 text-red-600'
+          }`}>
+            {score.eligible ? '✓ You appear eligible' : '✗ You may not be eligible'}
+          </div>
+
+          {/* Reason */}
+          <p className="text-sm text-gray-600">{score.reason}</p>
+
+          {/* Tip */}
+          <div className="bg-white rounded-lg p-3 border border-gray-100">
+            <p className="text-xs font-medium text-gray-500 mb-1">💡 Application tip</p>
+            <p className="text-sm text-gray-600">{score.tip}</p>
+          </div>
+
+          {/* Refresh */}
+          <button
+            onClick={getMatchScore}
+            disabled={loading}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Recalculate
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={getMatchScore}
+          disabled={loading}
+          className="w-full bg-white border border-gray-200 hover:border-green-300 
+          text-gray-700 font-medium py-2 rounded-lg text-sm transition-colors
+          disabled:opacity-50"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin rounded-full h-3 w-3 border-b border-gray-600" />
+              Analysing your profile...
+            </span>
+          ) : (
+            'Check my match score →'
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
 type Bursary = {
   id: string
   title: string
@@ -143,6 +294,8 @@ export default function BursaryDetailPage() {
         >
           ← Back to bursaries
         </Link>
+         {/* AI Match Score */}
+        <AIMatchScore bursaryId={id as string} bursary={bursary} />
 
         {/* Main card */}
         <div className="bg-white rounded-2xl border border-gray-100 p-8 mb-4">
