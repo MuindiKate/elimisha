@@ -1,293 +1,315 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-interface Bursary {
+type Bursary = {
   id: string
   title: string
   provider: string
-  description: string
-  amount: string
+  type: string
+  amount_min: number | null
+  amount_max: number | null
   deadline: string
-  eligibility_criteria: string
+  eligibility_counties: string[]
+  eligibility_levels: string[]
+  eligibility_income_max: number | null
+  description: string
+  how_to_apply: string
   documents_required: string[]
-  category: string
+  external_link: string | null
+  is_active: boolean
 }
 
-interface MatchResult {
-  score: number
-  verdict: string
-  strengths: string[]
-  gaps: string[]
+const TYPE_COLORS: Record<string, string> = {
+  county: 'bg-blue-50 text-blue-700',
+  cdf: 'bg-purple-50 text-purple-700',
+  university: 'bg-green-50 text-green-700',
+  ngo: 'bg-orange-50 text-orange-700',
+  private: 'bg-pink-50 text-pink-700',
+  government: 'bg-yellow-50 text-yellow-700',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  county: 'County', cdf: 'CDF', university: 'University',
+  ngo: 'NGO', private: 'Private', government: 'Government',
+}
+
+function formatAmount(min: number | null, max: number | null) {
+  if (!min && !max) return 'Amount varies'
+  if (!min && max) return `Up to KES ${max.toLocaleString()}`
+  if (min && !max) return `From KES ${min.toLocaleString()}`
+  return `KES ${min!.toLocaleString()} – ${max!.toLocaleString()}`
 }
 
 export default function BursaryDetailPage() {
   const { id } = useParams()
   const router = useRouter()
   const supabase = createClient()
-  
+
   const [bursary, setBursary] = useState<Bursary | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSaved, setIsSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // AI Match Score Engine States
-  const [matchData, setMatchData] = useState<MatchResult | null>(null)
-  const [loadingAI, setLoadingAI] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    async function fetchBursaryAndMatch() {
-      try {
-        setLoading(true)
-        const { data, error: fetchError } = await supabase
-          .from('bursaries')
-          .select('*')
-          .eq('id', id)
-          .single()
+    fetchBursary()
+    fetchUser()
+  }, [id])
 
-        if (fetchError) throw fetchError
-        setBursary(data)
-
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          // Check if application is already tracked by this authenticated session
-          const { data: existingApp } = await supabase
-            .from('applications')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('bursary_id', id)
-            .maybeSingle()
-            
-          if (existingApp) {
-            setIsSaved(true)
-          }
-
-          // Fetch the live AI Match compatibility analysis
-          setLoadingAI(true)
-          const res = await fetch(`/api/bursaries/${id}/match`)
-          if (res.ok) {
-            const scoreJson = await res.json()
-            setMatchData(scoreJson)
-          }
-        }
-      } catch (err: any) {
-        console.error('Error loading page details:', err)
-        setError(err.message || 'Failed to load details.')
-      } finally {
-        setLoading(false)
-        setLoadingAI(false)
-      }
-    }
-
-    if (id) fetchBursaryAndMatch()
-  }, [id, supabase])
-
-  const handleSaveBursary = async () => {
-    try {
-      setIsSaving(true)
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        router.push('/login?message=Please log in to track bursaries.')
-        return
-      }
-
-      if (isSaved) return
-
-      // Aligned with constraints: Using 'Applied'
-      const { error: insertError } = await supabase
+  async function fetchUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
+    if (user) {
+      // Check if student already saved/applied to this bursary
+      const { data } = await supabase
         .from('applications')
-        .insert([
-          {
-            user_id: user.id,
-            bursary_id: id,
-            status: 'Applied'
-          }
-        ])
-
-      if (insertError) {
-        console.dir(insertError) // Breakdown deep error attributes safely
-        throw new Error(insertError.message || `Database validation failed: ${insertError.code}`)
-      }
-      
-      setIsSaved(true)
-    } catch (err: any) {
-      console.error('Detailed Tracking Context:', err)
-      alert(err.message || 'Something went wrong while tracking.')
-    } finally {
-      setIsSaving(false)
+        .select('status')
+        .eq('user_id', user.id)
+        .eq('bursary_id', id)
+        .single()
+      if (data) setApplicationStatus(data.status)
     }
+  }
+
+  async function fetchBursary() {
+    // Fetch single bursary by ID from URL params
+    const { data, error } = await supabase
+      .from('bursaries')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) {
+      router.push('/bursaries')
+      return
+    }
+
+    setBursary(data)
+    setLoading(false)
+  }
+
+  async function handleSave(status: 'saved' | 'applied') {
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    setSaving(true)
+
+    // Upsert — inserts if doesn't exist, updates if it does
+    // This prevents duplicate applications for the same bursary
+    const { error } = await supabase
+      .from('applications')
+      .upsert({
+        user_id: user.id,
+        bursary_id: id,
+        status,
+        applied_at: status === 'applied' ? new Date().toISOString() : null,
+      }, {
+        onConflict: 'user_id,bursary_id'
+      })
+
+    if (!error) setApplicationStatus(status)
+    setSaving(false)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-500 animate-pulse text-lg">Loading details...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
       </div>
     )
   }
 
-  if (error || !bursary) {
-    return (
-      <div className="min-h-screen p-8 bg-gray-50 text-center">
-        <div className="max-w-3xl mx-auto bg-white rounded-xl p-8 border border-gray-200 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Bursary Not Found</h2>
-          <p className="text-gray-600 mb-6">{error || "The bursary you are looking for doesn't exist."}</p>
-          <Link href="/bursaries" className="text-indigo-600 font-medium hover:underline">
-            ← Back to bursaries listing
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  if (!bursary) return null
+
+  const daysLeft = Math.ceil(
+    (new Date(bursary.deadline).getTime() - new Date().getTime())
+    / (1000 * 60 * 60 * 24)
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        
-        {/* Navigation Breadcrumb */}
-        <div className="mb-6">
-          <Link href="/bursaries" className="text-sm font-medium text-indigo-600 hover:text-indigo-500 transition flex items-center gap-1">
-            ← Back to All Bursaries
-          </Link>
-        </div>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
 
-        {/* Core Layout Wrapper */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          
-          {/* Header Block */}
-          <div className="p-6 sm:p-8 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 mb-3">
-                {bursary.category || 'General'}
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-                {bursary.title}
-              </h1>
-              <p className="text-lg font-medium text-gray-600 mt-1">
-                Issued by: <span className="text-gray-800">{bursary.provider}</span>
-              </p>
-            </div>
+        {/* Back link */}
+        <Link
+          href="/bursaries"
+          className="text-sm text-green-600 font-medium hover:underline mb-6 block"
+        >
+          ← Back to bursaries
+        </Link>
 
-            <div className="sm:text-right shrink-0">
-              <button
-                onClick={handleSaveBursary}
-                disabled={isSaving || isSaved}
-                className={`w-full sm:w-auto px-6 py-3 rounded-xl font-semibold text-sm shadow-sm transition-all duration-200 ${
-                  isSaved
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95'
-                }`}
-              >
-                {isSaving ? 'Tracking...' : isSaved ? '✓ Added to Tracker' : 'Track Application'}
-              </button>
-            </div>
+        {/* Main card */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-8 mb-4">
+
+          {/* Type badge + deadline urgency */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full 
+            ${TYPE_COLORS[bursary.type]}`}>
+              {TYPE_LABELS[bursary.type]}
+            </span>
+            <span className={`text-sm font-medium ${
+              daysLeft <= 7 ? 'text-red-600' :
+              daysLeft <= 30 ? 'text-orange-500' : 'text-gray-500'
+            }`}>
+              {daysLeft <= 0 ? 'Closed' :
+               daysLeft <= 7 ? `⚠️ ${daysLeft} days left` :
+               `${daysLeft} days left`}
+            </span>
           </div>
 
-          {/* Core Descriptive Metrics */}
-          <div className="grid grid-cols-2 border-b border-gray-100 divide-x divide-gray-100 bg-slate-50/50">
-            <div className="p-4 text-center">
-              <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Value / Amount</span>
-              <span className="block text-lg font-bold text-gray-900 mt-1">{bursary.amount}</span>
+          {/* Title and provider */}
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">
+            {bursary.title}
+          </h1>
+          <p className="text-gray-500 mb-6">{bursary.provider}</p>
+
+          {/* Key details grid */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-1">Amount</p>
+              <p className="font-semibold text-gray-900 text-sm">
+                {formatAmount(bursary.amount_min, bursary.amount_max)}
+              </p>
             </div>
-            <div className="p-4 text-center">
-              <span className="block text-xs font-medium text-gray-400 uppercase tracking-wider">Application Deadline</span>
-              <span className="block text-lg font-bold text-rose-600 mt-1">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-xs text-gray-400 mb-1">Deadline</p>
+              <p className="font-semibold text-gray-900 text-sm">
                 {new Date(bursary.deadline).toLocaleDateString('en-KE', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
+                  day: 'numeric', month: 'long', year: 'numeric'
                 })}
-              </span>
-            </div>
-          </div>
-
-          {/* Content Body */}
-          <div className="p-6 sm:p-8 space-y-8">
-            
-            {/* Elimisha AI Eligibility Match Section */}
-            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-6 text-white shadow-md border border-indigo-900/40">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight text-indigo-200">Elimisha AI Eligibility Match</h3>
-                  <p className="text-xs text-slate-300 mt-0.5">Real-time profile compatibility evaluation</p>
-                </div>
-                {loadingAI ? (
-                  <div className="h-10 w-10 rounded-full border-4 border-indigo-400 border-t-transparent animate-spin shrink-0" />
-                ) : matchData ? (
-                  <div className="text-right shrink-0">
-                    <span className="text-3xl font-black text-emerald-400">{matchData.score}%</span>
-                    <span className="block text-[10px] font-semibold text-slate-300 uppercase tracking-wider mt-0.5">
-                      {matchData.verdict}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-400 italic">Sign in to load AI alignment index</span>
-                )}
-              </div>
-
-              {matchData && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border-t border-indigo-900/60 pt-4 text-sm">
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-2">✨ Alignment Factors</h4>
-                    <ul className="space-y-1.5 text-slate-200 text-xs list-disc list-inside">
-                      {matchData.strengths.map((str, i) => (
-                        <li key={i} className="leading-relaxed">{str}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wide mb-2">⚠️ Review Points / Gaps</h4>
-                    <ul className="space-y-1.5 text-slate-200 text-xs list-disc list-inside">
-                      {matchData.gaps.map((gap, i) => (
-                        <li key={i} className="leading-relaxed">{gap}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* General Fields */}
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-2">About this Bursary</h3>
-              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                {bursary.description}
               </p>
             </div>
+            {bursary.eligibility_counties.length > 0 && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-400 mb-1">Counties</p>
+                <p className="font-semibold text-gray-900 text-sm">
+                  {bursary.eligibility_counties.join(', ')}
+                </p>
+              </div>
+            )}
+            {bursary.eligibility_income_max && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-400 mb-1">Max household income</p>
+                <p className="font-semibold text-gray-900 text-sm">
+                  KES {bursary.eligibility_income_max.toLocaleString()}/month
+                </p>
+              </div>
+            )}
+          </div>
 
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-2">Eligibility Criteria</h3>
-              <div className="bg-gray-50 border border-gray-100 rounded-xl p-5 text-gray-700 leading-relaxed whitespace-pre-line">
-                {bursary.eligibility_criteria}
+          {/* Description */}
+          <div className="mb-6">
+            <h2 className="font-semibold text-gray-900 mb-2">About</h2>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {bursary.description}
+            </p>
+          </div>
+
+          {/* Eligibility levels */}
+          {bursary.eligibility_levels.length > 0 && (
+            <div className="mb-6">
+              <h2 className="font-semibold text-gray-900 mb-2">
+                Who can apply
+              </h2>
+              <div className="flex gap-2 flex-wrap">
+                {bursary.eligibility_levels.map(level => (
+                  <span key={level}
+                    className="text-xs px-3 py-1 bg-green-50 text-green-700 
+                    rounded-full capitalize">
+                    {level}
+                  </span>
+                ))}
               </div>
             </div>
+          )}
 
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-3">Required Documents</h3>
-              {bursary.documents_required && bursary.documents_required.length > 0 ? (
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {bursary.documents_required.map((doc, index) => (
-                    <li key={index} className="flex items-center gap-3 bg-white border border-gray-200 p-3 rounded-lg text-sm text-gray-700">
-                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-indigo-50 text-indigo-600 font-bold text-xs shrink-0">
-                        {index + 1}
-                      </span>
-                      {doc}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-gray-500 italic">No specific documents listed.</p>
-              )}
+          {/* How to apply */}
+          <div className="mb-6">
+            <h2 className="font-semibold text-gray-900 mb-2">How to apply</h2>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {bursary.how_to_apply}
+            </p>
+          </div>
+
+          {/* Documents required */}
+          {bursary.documents_required.length > 0 && (
+            <div className="mb-6">
+              <h2 className="font-semibold text-gray-900 mb-2">
+                Documents required
+              </h2>
+              <ul className="space-y-2">
+                {bursary.documents_required.map((doc, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    {doc}
+                  </li>
+                ))}
+              </ul>
             </div>
+          )}
 
+     {/* External link */}
+          {bursary.external_link && (
+            
+             <a href={bursary.external_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm text-green-600 font-medium hover:underline mb-6"
+            >
+              Visit official website →
+            </a>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-3 pt-4 border-t border-gray-100">
+            {applicationStatus === 'applied' ? (
+              <div className="flex-1 text-center py-2.5 bg-green-50 text-green-700 
+              rounded-lg text-sm font-medium">
+                ✅ Marked as applied
+              </div>
+            ) : applicationStatus === 'saved' ? (
+              <>
+                <button
+                  onClick={() => handleSave('applied')}
+                  disabled={saving}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white 
+                  font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Updating...' : 'Mark as applied'}
+                </button>
+                <div className="flex-1 text-center py-2.5 bg-gray-50 text-gray-500 
+                rounded-lg text-sm">
+                  ✓ Saved
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleSave('applied')}
+                  disabled={saving}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white 
+                  font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Mark as applied'}
+                </button>
+                <button
+                  onClick={() => handleSave('saved')}
+                  disabled={saving}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 
+                  font-medium py-2.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save for later'}
+                </button>
+              </>
+            )}
           </div>
         </div>
-
       </div>
     </div>
   )
