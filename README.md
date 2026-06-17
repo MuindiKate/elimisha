@@ -195,7 +195,9 @@ Planned MVP Features:
 * Opportunity bookmarking
 
 ---
-
+Live Project Link :
+https://elimisha-xi.vercel.app/
+*This project was deployed on Vercel.
 ## Author
 
 Catherine Mutheu Muindi
