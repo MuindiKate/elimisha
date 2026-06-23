@@ -111,7 +111,7 @@ export default async function DashboardPage() {
         {/* Two column layout */}
         <div className="grid md:grid-cols-2 gap-6">
 
-          {/* Quick actions */}
+         {/* Quick actions */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Quick actions</h2>
             <div className="space-y-3">
@@ -156,9 +156,29 @@ export default async function DashboardPage() {
                 </div>
                 <span className="text-gray-400">→</span>
               </Link>
+
+              {/* Notifications trigger */}
+              <form action="/api/notifications" method="POST">
+                <button
+                  type="submit"
+                  className="w-full flex items-center justify-between p-3 
+                  rounded-lg bg-purple-50 hover:bg-purple-100 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-purple-800 text-sm text-left">
+                      Send deadline reminders
+                    </p>
+                    <p className="text-purple-600 text-xs mt-0.5 text-left">
+                      Email students about closing bursaries
+                    </p>
+                  </div>
+                  <span className="text-purple-600">→</span>
+                </button>
+              </form>
+
             </div>
           </div>
-
+          
           {/* Upcoming deadlines */}
           <div className="bg-white rounded-xl border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
