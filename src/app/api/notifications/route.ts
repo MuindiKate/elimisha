@@ -10,6 +10,12 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 // In production this would be triggered by a cron job
 // For now we can trigger it manually or via a button
 export async function POST() {
+    
+  console.log('Notifications route hit')
+  console.log('RESEND KEY exists:', !!process.env.RESEND_API_KEY)
+  console.log('SERVICE ROLE KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+  console.log('SUPABASE URL exists:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
+  
   try {
     //const supabase = await createServerSideClient()
          const supabase = createAdminClient()
@@ -58,10 +64,17 @@ export async function POST() {
         if (!applications || applications.length === 0) continue
 
         for (const application of applications) {
-          const profile = application.profiles as any
+  const profile = application.profiles as any
 
-          // Skip if student disabled email notifications
-          if (!profile?.notifications_email) continue
+  console.log('Processing application:', application.user_id)
+  console.log('Profile:', profile)
+  console.log('notifications_email:', profile?.notifications_email)
+
+  // Skip if student disabled email notifications
+  if (!profile?.notifications_email) {
+    console.log('Skipping — notifications disabled')
+    continue
+  }
 
           // Check if we already sent this exact notification
           // to prevent duplicate emails
@@ -87,9 +100,12 @@ export async function POST() {
           if (!user?.email) continue
 
           // Send the email via Resend
-          const { error: emailError } = await resend.emails.send({
-            from: 'Elimisha <notifications@elimisha-xi.vercel.app>',
-            to: user.email,
+          console.log('Sending email to:', 'catherine.muindi@strathmore.edu')
+console.log('Bursary:', bursary.title)
+
+const { error: emailError } = await resend.emails.send({
+  from: 'Elimisha <onboarding@resend.dev>',
+  to: 'catherine.muindi@strathmore.edu',
             subject: `⏰ ${daysAhead} day${daysAhead === 1 ? '' : 's'} left — ${bursary.title}`,
             html: `
               <!DOCTYPE html>
